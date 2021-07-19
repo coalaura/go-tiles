@@ -1,0 +1,29 @@
+<style>
+    * {
+        box-sizing: border-box;
+    }
+    body {
+        margin: 0;
+        overflow: hidden;
+    }
+    #map {
+        width: 100vw;
+        height: 100vh;
+    }
+</style>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/leaflet.min.css"/>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/leaflet.min.js"></script>
+<div id="map"></div>
+<script>
+    let map = L.map('map', {
+        crs: L.CRS.Simple,
+        minZoom: 0,
+        maxZoom: 10,
+    });
+    L.tileLayer('tiles/{z}/{x}/{y}.jpg', {
+        minZoom: 0, maxZoom: 10,
+        attribution: 'Gotile'
+    }).addTo(map);
+
+    map.setView([-124, 124], 2);
+</script>
