@@ -12,7 +12,7 @@ func TestTileGenerator_Generate(t *testing.T) {
 		return
 	}
 
-	err = tg.Generate(0, 5, TileOptions{
+	err = tg.Generate(0, 8, TileOptions{
 		UseLanczos3: true,
 		Verbose:     true,
 		JpgQuality:  80,

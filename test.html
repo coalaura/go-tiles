@@ -1,3 +1,4 @@
+<title>Zoom: 2</title>
 <style>
     * {
         box-sizing: border-box;
@@ -26,4 +27,8 @@
     }).addTo(map);
 
     map.setView([-124, 124], 2);
+
+    map.on('zoomend', function() {
+        document.getElementsByTagName('title')[0].innerText = 'Zoom: ' + map.getZoom();
+    });
 </script>

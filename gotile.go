@@ -40,7 +40,7 @@ func NewTileGenerator(source string) (*TileGenerator, error) {
 	}
 
 	return &TileGenerator{
-		source: img,
+		source: prepareImage(img),
 	}, nil
 }
 
@@ -49,7 +49,7 @@ func (t *TileGenerator) Generate(minZoom, maxZoom int64, opts TileOptions) error
 		return errors.New("tiles folder already exists")
 	}
 
-	if opts.JpgQuality == 0 {
+	if opts.JpgQuality <= 5 {
 		opts.JpgQuality = 90
 	}
 
@@ -59,6 +59,8 @@ func (t *TileGenerator) Generate(minZoom, maxZoom int64, opts TileOptions) error
 	if b.Max.X != b.Max.Y {
 		return errors.New("source image has to be square")
 	}
+
+	start := time.Now()
 
 	p := message.NewPrinter(language.English)
 	if opts.Verbose {
@@ -82,12 +84,17 @@ func (t *TileGenerator) Generate(minZoom, maxZoom int64, opts TileOptions) error
 		}
 	}
 
+	if opts.Verbose {
+		fmt.Printf("Total time generating tiles: %s\n", time.Now().Sub(start).String())
+	}
+
 	return nil
 }
 
 func (t *TileGenerator) generateZoomLevel(zoom int64, opts TileOptions) error {
 	tiles := int64(math.Pow(2, float64(zoom)))
-	size := uint(tiles) * 256
+	ogSize := t.source.Bounds().Max.Y - 512
+	size := ogSize / int(tiles)
 
 	b := t.source.Bounds()
 	if b.Max.X != b.Max.Y {
@@ -96,13 +103,6 @@ func (t *TileGenerator) generateZoomLevel(zoom int64, opts TileOptions) error {
 
 	if tiles < 1 {
 		return errors.New("cannot render zoom level smaller than 0")
-	}
-
-	var source image.Image
-	if opts.UseLanczos3 {
-		source = resize.Resize(size, size, t.source, resize.Lanczos3)
-	} else {
-		source = resize.Resize(size, size, t.source, resize.NearestNeighbor)
 	}
 
 	errorChan := make(chan error)
@@ -124,12 +124,54 @@ func (t *TileGenerator) generateZoomLevel(zoom int64, opts TileOptions) error {
 					return
 				}
 
+				xx := (int(xAxis) * size) + 256
+				yy := (int(y) * size) + 256
+
+				factor := uint(3)
+				anchor := 1
+				offsetX := 256
+				offsetY := 256
+				if xAxis == 0 || y == 0 {
+					factor = 2
+
+					offsetX = 0
+					offsetY = 0
+					anchor = 0
+
+					if xAxis == tiles-1 || y == tiles-1 {
+						factor = 1
+					}
+				} else if xAxis == tiles-1 || y == tiles-1 {
+					factor = 2
+				}
+
 				crop, err := cutter.Crop(source, cutter.Config{
+					Width:  size * int(factor),
+					Height: size * int(factor),
+					Anchor: image.Point{
+						X: xx - (size * anchor),
+						Y: yy - (size * anchor),
+					},
+					Mode: cutter.TopLeft,
+				})
+				if err != nil {
+					errorChan <- err
+					return
+				}
+
+				var tile image.Image
+				if opts.UseLanczos3 {
+					tile = resize.Resize(256*factor, 256*factor, crop, resize.Lanczos3)
+				} else {
+					tile = resize.Resize(256*factor, 256*factor, crop, resize.NearestNeighbor)
+				}
+
+				crop, err = cutter.Crop(tile, cutter.Config{
 					Width:  256,
 					Height: 256,
 					Anchor: image.Point{
-						X: int(xAxis) * 256,
-						Y: int(y) * 256,
+						X: offsetX,
+						Y: offsetY,
 					},
 					Mode: cutter.TopLeft,
 				})
@@ -146,7 +188,7 @@ func (t *TileGenerator) generateZoomLevel(zoom int64, opts TileOptions) error {
 			}
 
 			errorChan <- nil
-		}(x, source)
+		}(x, t.source)
 	}
 
 	for {
