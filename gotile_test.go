@@ -6,13 +6,13 @@ import (
 )
 
 func TestTileGenerator_Generate(t *testing.T) {
-	tg, err := NewTileGenerator("example-map.jpg")
+	tg, err := NewTileGenerator("map.png")
 	if err != nil {
 		t.Error(err)
 		return
 	}
 
-	err = tg.Generate(0, 8, TileOptions{
+	err = tg.Generate(0, 6, TileOptions{
 		UseLanczos3: true,
 		Verbose:     true,
 		JpgQuality:  80,

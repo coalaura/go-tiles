@@ -6,10 +6,15 @@ import (
 	"github.com/briandowns/spinner"
 	"github.com/nfnt/resize"
 	"github.com/oliamb/cutter"
+	_ "golang.org/x/image/bmp"
+	_ "golang.org/x/image/tiff"
+	_ "golang.org/x/image/webp"
 	"golang.org/x/text/language"
 	"golang.org/x/text/message"
 	"image"
+	_ "image/gif"
 	"image/jpeg"
+	_ "image/png"
 	"math"
 	"os"
 	"os/exec"
@@ -28,6 +33,13 @@ type TileOptions struct {
 }
 
 func NewTileGenerator(source string) (*TileGenerator, error) {
+	ext := filepath.Ext(source)
+	switch ext {
+	case ".png", ".bmp", ".tiff", ".jpg", ".jpeg", ".webp":
+	default:
+		return nil, errors.New("unsupported image format " + ext)
+	}
+
 	f, err := os.Open(source)
 	if err != nil {
 		return nil, err

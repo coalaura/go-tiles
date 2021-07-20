@@ -10,5 +10,6 @@ require (
 	github.com/mattn/go-isatty v0.0.13 // indirect
 	github.com/nfnt/resize v0.0.0-20180221191011-83c6a9932646
 	github.com/oliamb/cutter v0.2.2
+	golang.org/x/image v0.0.0-20210628002857-a66eb6448b8d
 	golang.org/x/text v0.3.6
 )
