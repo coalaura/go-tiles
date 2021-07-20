@@ -1,4 +1,4 @@
-# ![banner](banner.png)
+# ![banner](banner-min.png)
 Map tile generator for tiling square map images.
 
 ## Usage
