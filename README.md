@@ -1,4 +1,4 @@
-# Gotiles
+# ![banner](banner.png)
 Map tile generator for tiling square map images.
 
 ## Usage
