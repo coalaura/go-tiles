@@ -19,6 +19,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"sync"
 	"time"
 )
 
@@ -118,6 +119,7 @@ func (t *TileGenerator) generateZoomLevel(zoom int64, opts TileOptions) error {
 	}
 
 	errorChan := make(chan error)
+	var countMutex sync.Mutex
 	finishedCount := int64(0)
 	killAll := false
 
@@ -128,6 +130,29 @@ func (t *TileGenerator) generateZoomLevel(zoom int64, opts TileOptions) error {
 		s.HideCursor = true
 		s.Start()
 	}
+
+	var wg sync.WaitGroup
+	wg.Add(1)
+	go func() {
+		if !opts.Verbose {
+			wg.Done()
+			return
+		}
+
+		for {
+			time.Sleep(150 * time.Millisecond)
+
+			countMutex.Lock()
+			perc := int(math.Round((float64(finishedCount) / float64(tiles*tiles)) * 100))
+			s.Prefix = fmt.Sprintf("%d%% ", perc)
+			countMutex.Unlock()
+
+			if killAll {
+				wg.Done()
+				return
+			}
+		}
+	}()
 
 	for x := int64(0); x < tiles; x++ {
 		go func(xAxis int64, source image.Image) {
@@ -197,6 +222,10 @@ func (t *TileGenerator) generateZoomLevel(zoom int64, opts TileOptions) error {
 					errorChan <- err
 					return
 				}
+
+				countMutex.Lock()
+				finishedCount++
+				countMutex.Unlock()
 			}
 
 			errorChan <- nil
@@ -206,6 +235,9 @@ func (t *TileGenerator) generateZoomLevel(zoom int64, opts TileOptions) error {
 	for {
 		err := <-errorChan
 		if err != nil {
+			killAll = true
+			wg.Wait()
+
 			if opts.Verbose {
 				s.Stop()
 			}
@@ -214,20 +246,19 @@ func (t *TileGenerator) generateZoomLevel(zoom int64, opts TileOptions) error {
 			return err
 		}
 
-		finishedCount++
+		countMutex.Lock()
+		if finishedCount == tiles*tiles {
+			countMutex.Unlock()
 
-		if opts.Verbose {
-			perc := int(math.Round((float64(finishedCount) / float64(tiles)) * 100))
-			s.Prefix = fmt.Sprintf("%d%% ", perc)
-		}
-
-		if finishedCount == tiles {
+			killAll = true
+			wg.Wait()
 			if opts.Verbose {
 				s.Stop()
 			}
 
 			return nil
 		}
+		countMutex.Unlock()
 	}
 }
 
