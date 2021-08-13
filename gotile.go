@@ -14,7 +14,7 @@ import (
 	"golang.org/x/text/message"
 	"image"
 	_ "image/gif"
-	"image/jpeg"
+	"image/png"
 	_ "image/png"
 	"math"
 	"os"
@@ -220,7 +220,7 @@ func (t *TileGenerator) generateZoomLevel(zoom int64) error {
 						return
 					}
 
-					err = storeImage(crop, xAxis, y, zoom, t.opts.JpgQuality)
+					err = storeImage(crop, xAxis, y, zoom, t.opts.UseCompressor)
 					if err != nil {
 						errorChan <- err
 						return
@@ -242,7 +242,7 @@ func (t *TileGenerator) generateZoomLevel(zoom int64) error {
 
 					tile := resize.Resize(256, 256, crop, resize.NearestNeighbor)
 
-					err = storeImage(tile, xAxis, y, zoom, t.opts.JpgQuality)
+					err = storeImage(tile, xAxis, y, zoom, t.opts.UseCompressor)
 					if err != nil {
 						errorChan <- err
 						return
