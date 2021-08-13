@@ -6,6 +6,7 @@ import (
 	"github.com/briandowns/spinner"
 	"github.com/nfnt/resize"
 	"github.com/oliamb/cutter"
+	"gitlab.com/milan44/goquant"
 	_ "golang.org/x/image/bmp"
 	_ "golang.org/x/image/tiff"
 	_ "golang.org/x/image/webp"
@@ -13,7 +14,7 @@ import (
 	"golang.org/x/text/message"
 	"image"
 	_ "image/gif"
-	"image/jpeg"
+	"image/png"
 	_ "image/png"
 	"math"
 	"os"
@@ -28,9 +29,9 @@ type TileGenerator struct {
 }
 
 type TileOptions struct {
-	UseLanczos3 bool
-	Verbose     bool
-	JpgQuality  int
+	UseLanczos3   bool
+	Verbose       bool
+	UseCompressor bool
 }
 
 func NewTileGenerator(source string) (*TileGenerator, error) {
@@ -60,10 +61,6 @@ func NewTileGenerator(source string) (*TileGenerator, error) {
 func (t *TileGenerator) Generate(minZoom, maxZoom int64, opts TileOptions) error {
 	if _, err := os.Stat("tiles"); !os.IsNotExist(err) {
 		return errors.New("tiles folder already exists")
-	}
-
-	if opts.JpgQuality <= 5 {
-		opts.JpgQuality = 90
 	}
 
 	_ = os.MkdirAll("tiles", 0777)
@@ -217,7 +214,7 @@ func (t *TileGenerator) generateZoomLevel(zoom int64, opts TileOptions) error {
 					return
 				}
 
-				err = storeImage(crop, xAxis, y, zoom, opts.JpgQuality)
+				err = storeImage(crop, xAxis, y, zoom, opts.UseCompressor)
 				if err != nil {
 					errorChan <- err
 					return
@@ -281,8 +278,8 @@ func (t *TileGenerator) CompressTileFolder(verbose bool) error {
 	return err
 }
 
-func storeImage(img image.Image, x, y, z int64, quality int) error {
-	file := fmt.Sprintf("tiles/%d/%d/%d.jpg", z, x, y)
+func storeImage(img image.Image, x, y, z int64, doCompress bool) error {
+	file := fmt.Sprintf("tiles/%d/%d/%d.png", z, x, y)
 	_ = os.MkdirAll(filepath.Dir(file), 0777)
 
 	out, err := os.Create(file)
@@ -291,7 +288,20 @@ func storeImage(img image.Image, x, y, z int64, quality int) error {
 	}
 	defer out.Close()
 
-	return jpeg.Encode(out, img, &jpeg.Options{
-		Quality: quality,
-	})
+	if doCompress {
+		img, err = goquant.CompressImage(img, &goquant.PNGQuantOptions{
+			BinaryLocation: "./lib/pngquant.exe",
+		})
+
+		if err != nil {
+			return err
+		}
+	}
+
+	err = png.Encode(out, img)
+	if err != nil {
+		return err
+	}
+
+	return nil
 }

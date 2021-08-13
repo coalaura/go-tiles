@@ -13,9 +13,9 @@ func TestTileGenerator_Generate(t *testing.T) {
 	}
 
 	err = tg.Generate(0, 6, TileOptions{
-		UseLanczos3: true,
-		Verbose:     true,
-		JpgQuality:  80,
+		UseLanczos3:   true,
+		Verbose:       true,
+		UseCompressor: true,
 	})
 	if err != nil {
 		t.Error(err)
