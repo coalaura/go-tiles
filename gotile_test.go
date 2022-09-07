@@ -7,24 +7,23 @@ import (
 
 func TestTileGenerator_Generate(t *testing.T) {
 	tg, err := NewTileGenerator("map.png", TileOptions{
-		UseLanczos3: true,
-		Verbose:     true,
-		UseCompressor: true,
+		UseLanczos3:             true,
+		Verbose:                 true,
+		UseCompressor:           true,
+		IgnoreCompressionErrors: true,
 	})
 	if err != nil {
-		t.Error(err)
-		return
+		panic(err)
 	}
 
 	err = tg.Generate(0, 8)
 	if err != nil {
-		t.Error(err)
-		return
+		panic(err)
 	}
 
 	fmt.Println("Compressing tiles")
 	err = tg.CompressTileFolder(false)
 	if err != nil {
-		t.Error(err)
+		panic(err)
 	}
 }

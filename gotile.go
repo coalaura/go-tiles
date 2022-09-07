@@ -30,9 +30,10 @@ type TileGenerator struct {
 }
 
 type TileOptions struct {
-	UseLanczos3   bool
-	Verbose       bool
-	UseCompressor bool
+	UseLanczos3             bool
+	Verbose                 bool
+	UseCompressor           bool
+	IgnoreCompressionErrors bool
 }
 
 func NewTileGenerator(source string, opts TileOptions) (*TileGenerator, error) {
@@ -220,7 +221,7 @@ func (t *TileGenerator) generateZoomLevel(zoom int64) error {
 						return
 					}
 
-					err = storeImage(crop, xAxis, y, zoom, t.opts.UseCompressor)
+					err = storeImage(crop, xAxis, y, zoom, t.opts.UseCompressor, t.opts.IgnoreCompressionErrors)
 					if err != nil {
 						errorChan <- err
 						return
@@ -242,8 +243,9 @@ func (t *TileGenerator) generateZoomLevel(zoom int64) error {
 
 					tile := resize.Resize(256, 256, crop, resize.NearestNeighbor)
 
-					err = storeImage(tile, xAxis, y, zoom, t.opts.UseCompressor)
+					err = storeImage(tile, xAxis, y, zoom, t.opts.UseCompressor, t.opts.IgnoreCompressionErrors)
 					if err != nil {
+						fmt.Println("2")
 						errorChan <- err
 						return
 					}
@@ -311,7 +313,7 @@ func (t *TileGenerator) CompressTileFolder(verbose bool) error {
 	return err
 }
 
-func storeImage(img image.Image, x, y, z int64, doCompress bool) error {
+func storeImage(img image.Image, x, y, z int64, doCompress, ignoreCompressionErrors bool) error {
 	file := fmt.Sprintf("tiles/%d/%d/%d.png", z, x, y)
 	_ = os.MkdirAll(filepath.Dir(file), 0777)
 
@@ -322,12 +324,16 @@ func storeImage(img image.Image, x, y, z int64, doCompress bool) error {
 	defer out.Close()
 
 	if doCompress {
-		img, err = goquant.CompressImage(img, &goquant.PNGQuantOptions{
+		cImg, err := goquant.CompressImage(img, &goquant.PNGQuantOptions{
 			BinaryLocation: "./lib/pngquant.exe",
 		})
 
 		if err != nil {
-			return err
+			if !ignoreCompressionErrors {
+				return err
+			}
+		} else {
+			img = cImg
 		}
 	}
 
