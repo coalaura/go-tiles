@@ -1,4 +1,4 @@
-package gotile
+package gotiles
 
 import (
 	"image"

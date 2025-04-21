@@ -1,20 +1,10 @@
-package gotile
+package gotiles
 
 import (
 	"errors"
 	"fmt"
-	"github.com/briandowns/spinner"
-	"github.com/nfnt/resize"
-	"github.com/oliamb/cutter"
-	"gitlab.com/milan44/goquant"
-	_ "golang.org/x/image/bmp"
-	_ "golang.org/x/image/tiff"
-	_ "golang.org/x/image/webp"
-	"golang.org/x/text/language"
-	"golang.org/x/text/message"
 	"image"
 	_ "image/gif"
-	"image/png"
 	_ "image/png"
 	"math"
 	"os"
@@ -22,6 +12,15 @@ import (
 	"path/filepath"
 	"sync"
 	"time"
+
+	"github.com/briandowns/spinner"
+	"github.com/gen2brain/webp"
+	"github.com/nfnt/resize"
+	"github.com/oliamb/cutter"
+	_ "golang.org/x/image/bmp"
+	_ "golang.org/x/image/tiff"
+	"golang.org/x/text/language"
+	"golang.org/x/text/message"
 )
 
 type TileGenerator struct {
@@ -30,10 +29,9 @@ type TileGenerator struct {
 }
 
 type TileOptions struct {
-	UseLanczos3             bool
-	Verbose                 bool
-	UseCompressor           bool
-	IgnoreCompressionErrors bool
+	UseLanczos3   bool
+	Verbose       bool
+	UseCompressor bool
 }
 
 func NewTileGenerator(source string, opts TileOptions) (*TileGenerator, error) {
@@ -80,8 +78,10 @@ func (t *TileGenerator) Generate(minZoom, maxZoom int64) error {
 	start := time.Now()
 
 	p := message.NewPrinter(language.English)
+
 	if t.opts.Verbose {
-		totalCount := int64(0)
+		var totalCount int64
+
 		for z := minZoom; z <= maxZoom; z++ {
 			totalCount += int64(math.Pow(math.Pow(2, float64(z)), 2))
 		}
@@ -95,8 +95,7 @@ func (t *TileGenerator) Generate(minZoom, maxZoom int64) error {
 			fmt.Printf("- Zoom %d/%d (%s tiles)\n", z, maxZoom, p.Sprintf("%d", count))
 		}
 
-		err := t.generateZoomLevel(z)
-		if err != nil {
+		if err := t.generateZoomLevel(z); err != nil {
 			return err
 		}
 	}
@@ -110,10 +109,13 @@ func (t *TileGenerator) Generate(minZoom, maxZoom int64) error {
 
 func (t *TileGenerator) generateZoomLevel(zoom int64) error {
 	tiles := int64(math.Pow(2, float64(zoom)))
+
 	ogSize := t.source.Bounds().Max.Y - 512
+
 	if !t.opts.UseLanczos3 {
 		ogSize += 512
 	}
+
 	rawSize := float64(ogSize) / float64(tiles)
 	size := int(math.Round(rawSize))
 
@@ -132,35 +134,39 @@ func (t *TileGenerator) generateZoomLevel(zoom int64) error {
 	killAll := false
 
 	var s *spinner.Spinner
+
 	if t.opts.Verbose {
 		s = spinner.New([]string{"-", "/", "|", "\\"}, 250*time.Millisecond)
+
 		s.Prefix = "0% "
 		s.HideCursor = true
+
 		s.Start()
 	}
 
 	var wg sync.WaitGroup
-	wg.Add(1)
-	go func() {
-		if !t.opts.Verbose {
-			wg.Done()
-			return
-		}
 
-		for {
-			time.Sleep(150 * time.Millisecond)
+	if t.opts.Verbose {
+		wg.Add(1)
 
-			countMutex.Lock()
-			perc := int(math.Round((float64(finishedCount) / float64(tiles*tiles)) * 100))
-			s.Prefix = fmt.Sprintf("%d%% ", perc)
-			countMutex.Unlock()
+		go func() {
+			for {
+				time.Sleep(150 * time.Millisecond)
 
-			if killAll {
-				wg.Done()
-				return
+				countMutex.Lock()
+				perc := int(math.Round((float64(finishedCount) / float64(tiles*tiles)) * 100))
+
+				s.Prefix = fmt.Sprintf("%d%% ", perc)
+				countMutex.Unlock()
+
+				if killAll {
+					wg.Done()
+
+					return
+				}
 			}
-		}
-	}()
+		}()
+	}
 
 	for x := int64(0); x < tiles; x++ {
 		go func(xAxis int64, source image.Image) {
@@ -177,6 +183,7 @@ func (t *TileGenerator) generateZoomLevel(zoom int64) error {
 					anchor := 1
 					offsetX := 256
 					offsetY := 256
+
 					if xAxis == 0 || y == 0 {
 						factor = 2
 
@@ -200,6 +207,7 @@ func (t *TileGenerator) generateZoomLevel(zoom int64) error {
 						},
 						Mode: cutter.TopLeft,
 					})
+
 					if err != nil {
 						errorChan <- err
 						return
@@ -216,12 +224,13 @@ func (t *TileGenerator) generateZoomLevel(zoom int64) error {
 						},
 						Mode: cutter.TopLeft,
 					})
+
 					if err != nil {
 						errorChan <- err
 						return
 					}
 
-					err = storeImage(crop, xAxis, y, zoom, t.opts.UseCompressor, t.opts.IgnoreCompressionErrors)
+					err = storeImage(crop, xAxis, y, zoom, t.opts.UseCompressor)
 					if err != nil {
 						errorChan <- err
 						return
@@ -236,6 +245,7 @@ func (t *TileGenerator) generateZoomLevel(zoom int64) error {
 						},
 						Mode: cutter.TopLeft,
 					})
+
 					if err != nil {
 						errorChan <- err
 						return
@@ -243,7 +253,7 @@ func (t *TileGenerator) generateZoomLevel(zoom int64) error {
 
 					tile := resize.Resize(256, 256, crop, resize.NearestNeighbor)
 
-					err = storeImage(tile, xAxis, y, zoom, t.opts.UseCompressor, t.opts.IgnoreCompressionErrors)
+					err = storeImage(tile, xAxis, y, zoom, t.opts.UseCompressor)
 					if err != nil {
 						fmt.Println("2")
 						errorChan <- err
@@ -262,6 +272,7 @@ func (t *TileGenerator) generateZoomLevel(zoom int64) error {
 
 	for {
 		err := <-errorChan
+
 		if err != nil {
 			killAll = true
 			wg.Wait()
@@ -271,6 +282,7 @@ func (t *TileGenerator) generateZoomLevel(zoom int64) error {
 			}
 
 			killAll = true
+
 			return err
 		}
 
@@ -280,6 +292,7 @@ func (t *TileGenerator) generateZoomLevel(zoom int64) error {
 
 			killAll = true
 			wg.Wait()
+
 			if t.opts.Verbose {
 				s.Stop()
 			}
@@ -295,52 +308,30 @@ func rnd(f float64) int {
 }
 
 func (t *TileGenerator) CompressTileFolder(verbose bool) error {
-	err := os.Chdir("tiles")
-	if err != nil {
-		return err
-	}
+	cmd := exec.Command("tar", "-czvf", "tiles.tar.gz", "tiles/*")
 
-	cmd := exec.Command("tar", "-czvf", ".."+string(os.PathSeparator)+"tiles.tar.gz", "*")
 	if verbose {
 		cmd.Stdout = os.Stdout
 		cmd.Stderr = os.Stderr
 	}
 
-	err = cmd.Run()
-
-	_ = os.Chdir("..")
-
-	return err
+	return cmd.Run()
 }
 
-func storeImage(img image.Image, x, y, z int64, doCompress, ignoreCompressionErrors bool) error {
-	file := fmt.Sprintf("tiles/%d/%d/%d.png", z, x, y)
-	_ = os.MkdirAll(filepath.Dir(file), 0777)
+func storeImage(img image.Image, x, y, z int64, doCompress bool) error {
+	file := fmt.Sprintf("tiles/%d/%d/%d.webp", z, x, y)
 
-	out, err := os.Create(file)
+	os.MkdirAll(filepath.Dir(file), 0777)
+
+	out, err := os.OpenFile(file, os.O_WRONLY|os.O_CREATE, 0644)
 	if err != nil {
 		return err
 	}
+
 	defer out.Close()
 
-	if doCompress {
-		cImg, err := goquant.CompressImage(img, &goquant.PNGQuantOptions{
-			BinaryLocation: "./lib/pngquant.exe",
-		})
-
-		if err != nil {
-			if !ignoreCompressionErrors {
-				return err
-			}
-		} else {
-			img = cImg
-		}
-	}
-
-	err = png.Encode(out, img)
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return webp.Encode(out, img, webp.Options{
+		Lossless: !doCompress,
+		Quality:  90,
+	})
 }
