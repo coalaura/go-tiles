@@ -29,7 +29,6 @@ type TileGenerator struct {
 }
 
 type TileOptions struct {
-	UseLanczos3   bool
 	Verbose       bool
 	UseCompressor bool
 }
@@ -51,10 +50,6 @@ func NewTileGenerator(source string, opts TileOptions) (*TileGenerator, error) {
 	img, _, err := image.Decode(f)
 	if err != nil {
 		return nil, err
-	}
-
-	if opts.UseLanczos3 {
-		img = prepareImage(img)
 	}
 
 	return &TileGenerator{
@@ -111,10 +106,6 @@ func (t *TileGenerator) generateZoomLevel(zoom int64) error {
 	tiles := int64(math.Pow(2, float64(zoom)))
 
 	ogSize := t.source.Bounds().Max.Y - 512
-
-	if !t.opts.UseLanczos3 {
-		ogSize += 512
-	}
 
 	rawSize := float64(ogSize) / float64(tiles)
 	size := int(math.Round(rawSize))
@@ -175,90 +166,28 @@ func (t *TileGenerator) generateZoomLevel(zoom int64) error {
 					return
 				}
 
-				if t.opts.UseLanczos3 {
-					xx := rnd(float64(xAxis)*rawSize) + 256
-					yy := rnd(float64(y)*rawSize) + 256
+				crop, err := cutter.Crop(source, cutter.Config{
+					Width:  size,
+					Height: size,
+					Anchor: image.Point{
+						X: rnd(float64(xAxis) * rawSize),
+						Y: rnd(float64(y) * rawSize),
+					},
+					Mode: cutter.TopLeft,
+				})
 
-					factor := uint(3)
-					anchor := 1
-					offsetX := 256
-					offsetY := 256
+				if err != nil {
+					errorChan <- err
+					return
+				}
 
-					if xAxis == 0 || y == 0 {
-						factor = 2
+				tile := resize.Resize(256, 256, crop, resize.NearestNeighbor)
 
-						offsetX = 0
-						offsetY = 0
-						anchor = 0
-
-						if xAxis == tiles-1 || y == tiles-1 {
-							factor = 1
-						}
-					} else if xAxis == tiles-1 || y == tiles-1 {
-						factor = 2
-					}
-
-					crop, err := cutter.Crop(source, cutter.Config{
-						Width:  rnd(rawSize * float64(factor)),
-						Height: rnd(rawSize * float64(factor)),
-						Anchor: image.Point{
-							X: xx - rnd(rawSize*float64(anchor)),
-							Y: yy - rnd(rawSize*float64(anchor)),
-						},
-						Mode: cutter.TopLeft,
-					})
-
-					if err != nil {
-						errorChan <- err
-						return
-					}
-
-					tile := resize.Resize(256*factor, 256*factor, crop, resize.Lanczos3)
-
-					crop, err = cutter.Crop(tile, cutter.Config{
-						Width:  256,
-						Height: 256,
-						Anchor: image.Point{
-							X: offsetX,
-							Y: offsetY,
-						},
-						Mode: cutter.TopLeft,
-					})
-
-					if err != nil {
-						errorChan <- err
-						return
-					}
-
-					err = storeImage(crop, xAxis, y, zoom, t.opts.UseCompressor)
-					if err != nil {
-						errorChan <- err
-						return
-					}
-				} else {
-					crop, err := cutter.Crop(source, cutter.Config{
-						Width:  size,
-						Height: size,
-						Anchor: image.Point{
-							X: rnd(float64(xAxis) * rawSize),
-							Y: rnd(float64(y) * rawSize),
-						},
-						Mode: cutter.TopLeft,
-					})
-
-					if err != nil {
-						errorChan <- err
-						return
-					}
-
-					tile := resize.Resize(256, 256, crop, resize.NearestNeighbor)
-
-					err = storeImage(tile, xAxis, y, zoom, t.opts.UseCompressor)
-					if err != nil {
-						fmt.Println("2")
-						errorChan <- err
-						return
-					}
+				err = storeImage(tile, xAxis, y, zoom, t.opts.UseCompressor)
+				if err != nil {
+					fmt.Println("2")
+					errorChan <- err
+					return
 				}
 
 				countMutex.Lock()

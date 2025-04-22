@@ -17,7 +17,6 @@ func main() {
 
     // Generate map tiles -> ./tiles/{z}/{x}/{y}.jpg
     err = tg.Generate(0, 6, gotile.TileOptions{
-        UseLanczos3:   true, // Use Lanczos3 or NearestNeighbor for resizing (Lanczos3 is better if tiles have to get upscaled)
         Verbose:       true, // Print progress information to stdout
         UseCompressor: true, // Compress resulting webp files
     })

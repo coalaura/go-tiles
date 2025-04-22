@@ -7,7 +7,6 @@ import (
 
 func TestTileGenerator_Generate(t *testing.T) {
 	tg, err := NewTileGenerator("map.png", TileOptions{
-		UseLanczos3:   true,
 		Verbose:       true,
 		UseCompressor: true,
 	})
